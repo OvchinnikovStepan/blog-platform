@@ -10,17 +10,6 @@ class ArticleController:
     def create_article(article_data: ArticleCreate, author: User, db: Session):
         slug = create_slug(article_data.title)
         
-        # Проверяем существующую НЕУДАЛЕННУЮ статью с таким slug
-        existing_article = db.query(Article).filter(
-            Article.slug == slug, 
-            Article.is_deleted == False
-        ).first()
-        if existing_article:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Article with this title already exists"
-            )
-        
         tags = []
         for tag_name in article_data.tagList:
             tag = db.query(Tag).filter(Tag.name == tag_name).first()
@@ -99,17 +88,6 @@ class ArticleController:
         # Если меняется заголовок, обновляем slug
         if 'title' in update_data:
             new_slug = create_slug(update_data['title'])
-            # Проверяем, что новый slug не занят другой статьей
-            existing = db.query(Article).filter(
-                Article.slug == new_slug,
-                Article.id != article_id,
-                Article.is_deleted == False
-            ).first()
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Article with this title already exists"
-                )
             update_data['slug'] = new_slug
         
         if 'tagList' in update_data:

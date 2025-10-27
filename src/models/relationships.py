@@ -13,5 +13,4 @@ def setup_relationships():
     Comment.article = relationship("Article", back_populates="comments")
     Comment.author = relationship("User", back_populates="comments")
 
-# Вызываем настройку relationships
 setup_relationships()

@@ -45,8 +45,8 @@ class Article(Base):
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    is_deleted = Column(Boolean, default=False)  # Флаг мягкого удаления
-    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Когда удалено
+    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
 class Comment(Base):
     __tablename__ = "comments"
@@ -58,5 +58,5 @@ class Comment(Base):
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    is_deleted = Column(Boolean, default=False)  # Флаг мягкого удаления
-    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Когда удалено
+    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)

@@ -4,27 +4,31 @@ from datetime import datetime
 from src.schemas.user import UserResponse
 
 class ArticleBase(BaseModel):
+    """Базовая схема статьи"""
     title: str
     description: str
     body: str
     tagList: Optional[List[str]] = []
 
 class ArticleCreate(ArticleBase):
+    """Схема создания статьи (идентична базовой)"""
     pass
 
 class ArticleUpdate(BaseModel):
+    """Схема редактирования статьи"""
     title: Optional[str] = None
     description: Optional[str] = None
     body: Optional[str] = None
     tagList: Optional[List[str]] = None
 
 class ArticleResponse(ArticleBase):
+    """Схема ответа на запрос по статье"""
     slug: str
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
     author: UserResponse
-    tags: List[str] = []  # Это должно быть список строк, а не объектов Tag
+    tags: List[str] = [] 
     
     class Config:
         from_attributes = True
@@ -47,5 +51,6 @@ class ArticleResponse(ArticleBase):
         return v
 
 class ArticleListResponse(BaseModel):
+    "Получение списка статей"
     articles: List[ArticleResponse]
     articles_count: int

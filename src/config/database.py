@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Используем переменные окружения с значениями по умолчанию для разработки
+# Используем переменные окружения с значениями по умолчанию
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "postgresql://blog_user:blog_password@localhost:5432/blog_db"
