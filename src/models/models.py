@@ -1,55 +1,56 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.config.database import Base
 
-# Association table for article tags
+# Таблица связи многие-ко-многим
 article_tags = Table(
     'article_tags',
     Base.metadata,
-    Column('article_id', Integer, ForeignKey('articles.id')),
-    Column('tag_id', Integer, ForeignKey('tags.id'))
+    Column('article_id', Integer, ForeignKey('articles.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True),
+    extend_existing=True
 )
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    username = Column(String(100), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
     bio = Column(Text, nullable=True)
-    image_url = Column(String, nullable=True)
+    image_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    articles = relationship("Article", back_populates="author")
-    comments = relationship("Comment", back_populates="author")
+    is_active = Column(Boolean, default=True)  # Для мягкого удаления пользователей
 
 class Tag(Base):
     __tablename__ = "tags"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String(50), unique=True, index=True, nullable=False)
 
 class Article(Base):
     __tablename__ = "articles"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True, nullable=False)
-    slug = Column(String, unique=True, index=True, nullable=False)
-    description = Column(String, nullable=False)
+    title = Column(String(255), index=True, nullable=False)
+    slug = Column(String(300), unique=True, index=True, nullable=False)
+    description = Column(Text, nullable=False)
     body = Column(Text, nullable=False)
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    author = relationship("User", back_populates="articles")
-    comments = relationship("Comment", back_populates="article")
-    tags = relationship("Tag", secondary=article_tags, backref="articles")
+    is_deleted = Column(Boolean, default=False)  # Флаг мягкого удаления
+    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Когда удалено
 
 class Comment(Base):
     __tablename__ = "comments"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     body = Column(Text, nullable=False)
@@ -57,6 +58,5 @@ class Comment(Base):
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    article = relationship("Article", back_populates="comments")
-    author = relationship("User", back_populates="comments")
+    is_deleted = Column(Boolean, default=False)  # Флаг мягкого удаления
+    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Когда удалено
