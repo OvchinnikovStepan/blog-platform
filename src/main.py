@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from sqlalchemy import text
+from src.config.database import SessionLocal
 
 app = FastAPI(
     title="Blog Platform API",
@@ -21,7 +23,23 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check that verifies both API and database connectivity"""
+    try:
+        # Проверяем подключение к БД
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        
+        return {
+            "status": "healthy",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "database": "disconnected",
+            "error": str(e)
+        }, 503
 
 if __name__ == "__main__":
     import uvicorn

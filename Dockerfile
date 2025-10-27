@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем requirements отдельно для кэширования
