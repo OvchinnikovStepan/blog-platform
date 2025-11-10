@@ -1,24 +1,51 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
+from src.config.config import settings
 
-load_dotenv()
-
-# Используем переменные окружения с значениями по умолчанию
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql://blog_user:blog_password@localhost:5432/blog_db"
+# Асинхронный движок БД
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,  # Логирование SQL запросов в debug режиме
+    future=True
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Асинхронная фабрика сессий
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False
+)
+
 Base = declarative_base()
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Экспортируем DATABASE_URL для обратной совместимости с миграциями
+DATABASE_URL = settings.DATABASE_URL
+
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+async def create_tables():
+    """Создание таблиц в БД (для миграций и тестов)"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+async def drop_tables():
+    """Удаление таблиц (для тестов)"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+from sqlalchemy import create_engine as create_sync_engine
+
+# Синхронный движок для миграций Alembic
+sync_engine = create_sync_engine(
+    settings.DATABASE_URL.replace('+asyncpg', ''),  # Убираем asyncpg для синхронного подключения
+    echo=settings.DEBUG
+)

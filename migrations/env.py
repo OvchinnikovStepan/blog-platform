@@ -5,23 +5,30 @@ from alembic import context
 import os
 import sys
 
-# Добавляем путь к проекту в Python path
+# Добавляем путь к проекту
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-# Импортируем наши модели
-from src.config.database import DATABASE_URL, Base
+from src.config.config import settings
+from src.config.database import Base
 from src.models.models import *
 
 config = context.config
 
-# Настраиваем подключение к БД
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+# Используем синхронный URL для миграций
+sync_database_url = settings.DATABASE_URL.replace('+asyncpg', '')
+config.set_main_option("sqlalchemy.url", sync_database_url)
 
-# Указываем метаданные для отслеживания
+# Упрощенная настройка логгирования
+if config.config_file_name is not None:
+    try:
+        fileConfig(config.config_file_name)
+    except Exception:
+        # Если конфиг логгирования сломан, игнорируем
+        pass
+
 target_metadata = Base.metadata
 
 def run_migrations_offline():
-    """Запуск миграций в оффлайн режиме."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -29,24 +36,20 @@ def run_migrations_offline():
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
 def run_migrations_online():
-    """Запуск миграций в онлайн режиме."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
         context.configure(
-            connection=connection,
+            connection=connection, 
             target_metadata=target_metadata
         )
-
         with context.begin_transaction():
             context.run_migrations()
 

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: blog_postgres
     environment:
       POSTGRES_DB: blog_db
@@ -16,15 +16,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    restart: unless-stopped
 
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: blog_app
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://blog_user:blog_password@postgres:5432/blog_db
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,11 +35,17 @@ services:
              alembic upgrade head && 
              uvicorn src.main:app --host 0.0.0.0 --port 8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5).raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+    name: blog_postgres_data
+
+networks:
+  default:
+    name: blog_network

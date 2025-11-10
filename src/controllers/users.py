@@ -1,18 +1,25 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from fastapi import HTTPException, status
 from src.models.models import User
-from src.schemas.user import UserCreate, UserLogin, UserUpdate, UserResponse
-from src.config.auth import verify_password, get_password_hash
-from src.utils.auth import create_access_token
+from src.schemas.user import UserCreate, UserLogin, UserUpdate
+from src.config.auth import verify_password, get_password_hash, create_access_token
 from datetime import timedelta
+from src.config.config import settings
 
 class UserController:
+    """Асинхронный контроллер для операций с пользователями"""
+    
     @staticmethod
-    def register_user(user_data: UserCreate, db: Session):
-        # Проверяем, существует ли пользователь с таким email
-        existing_user = db.query(User).filter(
-            (User.email == user_data.email) | (User.username == user_data.username)
-        ).first()
+    async def register_user(user_data: UserCreate, db: AsyncSession) -> User:
+        """Асинхронная регистрация пользователя"""
+        # Проверяем, существует ли пользователь
+        result = await db.execute(
+            select(User).filter(
+                (User.email == user_data.email) | (User.username == user_data.username)
+            )
+        )
+        existing_user = result.scalar_one_or_none()
         
         if existing_user:
             raise HTTPException(
@@ -29,14 +36,18 @@ class UserController:
         )
         
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
         
         return user
     
     @staticmethod
-    def authenticate_user(login_data: UserLogin, db: Session):
-        user = db.query(User).filter(User.email == login_data.email).first()
+    async def authenticate_user(login_data: UserLogin, db: AsyncSession) -> dict:
+        """Асинхронная аутентификация пользователя"""
+        result = await db.execute(
+            select(User).filter(User.email == login_data.email)
+        )
+        user = result.scalar_one_or_none()
         
         if not user or not verify_password(login_data.password, user.hashed_password):
             raise HTTPException(
@@ -47,7 +58,7 @@ class UserController:
         # Создаем токен
         access_token = create_access_token(
             data={"user_id": user.id},
-            expires_delta=timedelta(minutes=30)
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
         
         return {
@@ -57,11 +68,13 @@ class UserController:
         }
     
     @staticmethod
-    def get_current_user_profile(current_user: User):
+    async def get_current_user_profile(current_user: User) -> User:
+        """Получение профиля текущего пользователя"""
         return current_user
     
     @staticmethod
-    def update_user_profile(user_data: UserUpdate, current_user: User, db: Session):
+    async def update_user_profile(user_data: UserUpdate, current_user: User, db: AsyncSession) -> User:
+        """Асинхронное обновление профиля пользователя"""
         update_data = user_data.dict(exclude_unset=True)
         
         if "password" in update_data:
@@ -70,6 +83,6 @@ class UserController:
         for field, value in update_data.items():
             setattr(current_user, field, value)
         
-        db.commit()
-        db.refresh(current_user)
+        await db.commit()
+        await db.refresh(current_user)
         return current_user

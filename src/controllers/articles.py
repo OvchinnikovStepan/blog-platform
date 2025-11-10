@@ -1,4 +1,6 @@
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from datetime import datetime
 from src.models.models import Article, User, Tag
@@ -6,19 +8,40 @@ from src.schemas.article import ArticleCreate, ArticleUpdate
 from src.utils.slug import create_slug
 
 class ArticleController:
+    """Асинхронный контроллер для операций со статьями"""
+    
     @staticmethod
-    def create_article(article_data: ArticleCreate, author: User, db: Session):
+    async def create_article(article_data: ArticleCreate, author: User, db: AsyncSession) -> Article:
+        """Асинхронное создание статьи"""
         slug = create_slug(article_data.title)
         
+        # Проверяем существующую статью
+        result = await db.execute(
+            select(Article).filter(
+                Article.slug == slug, 
+                Article.is_deleted == False
+            )
+        )
+        existing_article = result.scalar_one_or_none()
+        
+        if existing_article:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Article with this title already exists"
+            )
+        
+        # Обрабатываем теги
         tags = []
         for tag_name in article_data.tagList:
-            tag = db.query(Tag).filter(Tag.name == tag_name).first()
+            result = await db.execute(select(Tag).filter(Tag.name == tag_name))
+            tag = result.scalar_one_or_none()
             if not tag:
                 tag = Tag(name=tag_name)
                 db.add(tag)
-                db.flush()
+                await db.flush()
             tags.append(tag)
         
+        # Создаем статью
         article = Article(
             title=article_data.title,
             slug=slug,
@@ -29,31 +52,43 @@ class ArticleController:
         article.tags = tags
         
         db.add(article)
-        db.commit()
-        db.refresh(article)
+        await db.commit()
+        await db.refresh(article)
         
         return article
     
     @staticmethod
-    def get_articles(db: Session, skip: int = 0, limit: int = 20):
-        # Получаем только НЕУДАЛЕННЫЕ статьи
-        articles = db.query(Article).options(
-            joinedload(Article.author),
-            joinedload(Article.tags)
-        ).filter(
-            Article.is_deleted == False
-        ).offset(skip).limit(limit).all()
+    async def get_articles(db: AsyncSession, skip: int = 0, limit: int = 20) -> list[Article]:
+        """Асинхронное получение списка статей"""
+        result = await db.execute(
+            select(Article)
+            .options(
+                selectinload(Article.author),
+                selectinload(Article.tags)
+            )
+            .filter(Article.is_deleted == False)
+            .order_by(Article.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        articles = result.scalars().all()
         return articles
     
     @staticmethod
-    def get_article_by_id(article_id: int, db: Session):
-        article = db.query(Article).options(
-            joinedload(Article.author),
-            joinedload(Article.tags)
-        ).filter(
-            Article.id == article_id,
-            Article.is_deleted == False
-        ).first()
+    async def get_article_by_id(article_id: int, db: AsyncSession) -> Article:
+        """Асинхронное получение статьи по ID"""
+        result = await db.execute(
+            select(Article)
+            .options(
+                selectinload(Article.author),
+                selectinload(Article.tags)
+            )
+            .filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
         
         if not article:
             raise HTTPException(
@@ -63,13 +98,17 @@ class ArticleController:
         return article
     
     @staticmethod
-    def update_article(article_id: int, article_data: ArticleUpdate, current_user: User, db: Session):
-        article = db.query(Article).options(
-            joinedload(Article.tags)
-        ).filter(
-            Article.id == article_id,
-            Article.is_deleted == False
-        ).first()
+    async def update_article(article_id: int, article_data: ArticleUpdate, current_user: User, db: AsyncSession) -> Article:
+        """Асинхронное обновление статьи"""
+        result = await db.execute(
+            select(Article)
+            .options(selectinload(Article.tags))
+            .filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
         
         if not article:
             raise HTTPException(
@@ -77,6 +116,7 @@ class ArticleController:
                 detail="Article not found"
             )
         
+        # Проверяем права
         if article.author_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -85,35 +125,56 @@ class ArticleController:
         
         update_data = article_data.dict(exclude_unset=True)
         
-        # Если меняется заголовок, обновляем slug
+        # Обновляем slug если изменился заголовок
         if 'title' in update_data:
             new_slug = create_slug(update_data['title'])
+            # Проверяем, что новый slug не занят
+            result = await db.execute(
+                select(Article).filter(
+                    Article.slug == new_slug,
+                    Article.id != article_id,
+                    Article.is_deleted == False
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Article with this title already exists"
+                )
             update_data['slug'] = new_slug
         
+        # Обновляем теги
         if 'tagList' in update_data:
             tags = []
             for tag_name in update_data.pop('tagList'):
-                tag = db.query(Tag).filter(Tag.name == tag_name).first()
+                result = await db.execute(select(Tag).filter(Tag.name == tag_name))
+                tag = result.scalar_one_or_none()
                 if not tag:
                     tag = Tag(name=tag_name)
                     db.add(tag)
-                    db.flush()
+                    await db.flush()
                 tags.append(tag)
             article.tags = tags
         
+        # Обновляем остальные поля
         for field, value in update_data.items():
             setattr(article, field, value)
         
-        db.commit()
-        db.refresh(article)
+        await db.commit()
+        await db.refresh(article)
         return article
     
     @staticmethod
-    def soft_delete_article(article_id: int, current_user: User, db: Session):
-        article = db.query(Article).filter(
-            Article.id == article_id,
-            Article.is_deleted == False
-        ).first()
+    async def soft_delete_article(article_id: int, current_user: User, db: AsyncSession) -> dict:
+        """Асинхронное мягкое удаление статьи"""
+        result = await db.execute(
+            select(Article).filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
         
         if not article:
             raise HTTPException(
@@ -127,9 +188,9 @@ class ArticleController:
                 detail="Not authorized to delete this article"
             )
         
-        # Мягкое удаление - меняем статус
+        # Мягкое удаление
         article.is_deleted = True
         article.deleted_at = datetime.utcnow()
         
-        db.commit()
+        await db.commit()
         return {"message": "Article soft deleted successfully"}

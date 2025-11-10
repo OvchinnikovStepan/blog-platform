@@ -1,11 +1,23 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from src.config.database import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.config.database import AsyncSessionLocal, settings
+from src.config.config import settings as app_settings
 
 app = FastAPI(
-    title="Blog Platform API",
+    title=app_settings.APP_NAME,
     description="A simple blog platform built with FastAPI",
     version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=app_settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def setup_routes():
@@ -23,24 +35,29 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check that verifies both API and database connectivity"""
+    """Health check с асинхронной проверкой БД"""
     try:
-        # Проверяем подключение к БД
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        db.close()
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
         
         return {
             "status": "healthy",
-            "database": "connected"
+            "database": "connected", 
+            "app": app_settings.APP_NAME,
+            "debug": app_settings.DEBUG
         }
     except Exception as e:
         return {
-            "status": "unhealthy", 
+            "status": "unhealthy",
             "database": "disconnected",
             "error": str(e)
         }, 503
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(
+        "src.main:app", 
+        host="0.0.0.0", 
+        port=8000, 
+        reload=app_settings.DEBUG
+    )
