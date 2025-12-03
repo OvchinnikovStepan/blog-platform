@@ -19,7 +19,14 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False
 )
 
-Base = declarative_base()
+DeclarativeBase = declarative_base()
+
+class Base(DeclarativeBase):
+    __abstract__=True
+    @classmethod
+    @property
+    def __tablename__(cls):
+        return cls.__qualname__.lower() + "s"
 
 # Экспортируем DATABASE_URL для обратной совместимости с миграциями
 DATABASE_URL = settings.DATABASE_URL

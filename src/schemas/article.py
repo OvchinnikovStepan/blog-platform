@@ -8,7 +8,7 @@ class ArticleBase(BaseModel):
     title: str
     description: str
     body: str
-    tagList: Optional[List[str]] = []
+    tags: List[str] = [] 
 
 class ArticleCreate(ArticleBase):
     """Схема создания статьи (идентична базовой)"""
@@ -19,7 +19,7 @@ class ArticleUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     body: Optional[str] = None
-    tagList: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
 
 class ArticleResponse(ArticleBase):
     """Схема ответа на запрос по статье"""
@@ -28,7 +28,6 @@ class ArticleResponse(ArticleBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     author: UserResponse
-    tags: List[str] = [] 
     
     class Config:
         from_attributes = True
@@ -42,13 +41,6 @@ class ArticleResponse(ArticleBase):
             return [tag.name for tag in v]
         return v
 
-    @field_validator('tagList', mode='before')
-    @classmethod
-    def convert_taglist_to_strings(cls, v):
-        """Конвертируем tagList в строки"""
-        if v and isinstance(v[0], object) and hasattr(v[0], 'name'):
-            return [tag.name for tag in v]
-        return v
 
 class ArticleListResponse(BaseModel):
     "Получение списка статей"

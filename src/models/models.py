@@ -13,7 +13,6 @@ article_tags = Table(
 )
 
 class User(Base):
-    __tablename__ = "users"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
@@ -27,14 +26,12 @@ class User(Base):
     is_active = Column(Boolean, default=True)  # Для мягкого удаления пользователей
 
 class Tag(Base):
-    __tablename__ = "tags"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, index=True, nullable=False)
 
 class Article(Base):
-    __tablename__ = "articles"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
@@ -49,7 +46,6 @@ class Article(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
 class Comment(Base):
-    __tablename__ = "comments"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)

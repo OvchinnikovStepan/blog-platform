@@ -29,10 +29,10 @@ class ArticleController:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Article with this title already exists"
             )
-        
+
         # Обрабатываем теги
         tags = []
-        for tag_name in article_data.tagList:
+        for tag_name in article_data.tags:
             result = await db.execute(select(Tag).filter(Tag.name == tag_name))
             tag = result.scalar_one_or_none()
             if not tag:
@@ -53,9 +53,17 @@ class ArticleController:
         
         db.add(article)
         await db.commit()
-        await db.refresh(article)
+
+        result = await db.execute(
+            select(Article)
+            .options(selectinload(Article.tags))  # ← ВАЖНО: явная загрузка тегов
+            .where(Article.id == article.id)
+        )
+        article_with_relations = result.scalar_one()
+
+      #  await db.refresh(article)
         
-        return article
+        return article_with_relations
     
     @staticmethod
     async def get_articles(db: AsyncSession, skip: int = 0, limit: int = 20) -> list[Article]:
@@ -145,9 +153,9 @@ class ArticleController:
             update_data['slug'] = new_slug
         
         # Обновляем теги
-        if 'tagList' in update_data:
+        if 'tags' in update_data:
             tags = []
-            for tag_name in update_data.pop('tagList'):
+            for tag_name in update_data.pop('tags'):
                 result = await db.execute(select(Tag).filter(Tag.name == tag_name))
                 tag = result.scalar_one_or_none()
                 if not tag:
