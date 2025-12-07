@@ -1,12 +1,20 @@
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import httpx
 from fastapi import Request, HTTPException, Depends
 
-USERS_SERVICE_URL = "http://users-service:8000"   # имя контейнера
+USERS_SERVICE_URL = "http://users-service:8000"
 
-async def verify_token(request: Request):
+security = HTTPBearer()
+
+async def verify_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     auth_header = request.headers.get("Authorization")
     if not auth_header:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+        if not credentials or not credentials.credentials:
+            raise HTTPException(status_code=401, detail="Missing Authorization header")
+        auth_header = f"Bearer {credentials.credentials}"
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -17,4 +25,4 @@ async def verify_token(request: Request):
     if resp.status_code != 200:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    return resp.json()  # данные пользователя из users-service
+    return resp.json()

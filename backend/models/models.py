@@ -3,14 +3,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from config.database import Base
 
-# Таблица связи многие-ко-многим
-article_tags = Table(
-    'article_tags',
-    Base.metadata,
-    Column('article_id', Integer, ForeignKey('articles.id'), primary_key=True),
-    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True),
-    extend_existing=True
-)
 
 class Tag(Base):
     __table_args__ = {'extend_existing': True}
@@ -31,6 +23,16 @@ class Article(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    tags = relationship("Tag", secondary="article_tags", backref="articles")
+
+# Таблица связи многие-ко-многим
+article_tags = Table(
+    'article_tags',
+    Base.metadata,
+    Column('article_id', Integer, ForeignKey('articles.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True),
+    extend_existing=True
+)
 
 class Comment(Base):
     __table_args__ = {'extend_existing': True}

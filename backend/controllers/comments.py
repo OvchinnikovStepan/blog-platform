@@ -31,7 +31,7 @@ class CommentController:
         comment = Comment(
             body=comment_data.body,
             article_id=article_id,
-            author_id=author.id
+            author_id=author.get("id")
         )
         
         db.add(comment)
@@ -93,7 +93,7 @@ class CommentController:
             )
         
         # Проверяем права: автор комментария или автор статьи
-        if comment.author_id != current_user.id and comment.article.author_id != current_user.id:
+        if comment.author_id != current_user.get("id") and comment.article.author_id != current_user.get("id"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this comment"

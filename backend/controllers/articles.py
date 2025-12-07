@@ -47,7 +47,7 @@ class ArticleController:
             slug=slug,
             description=article_data.description,
             body=article_data.body,
-            author_id=author.id,
+            author_id=author.get("id"),
         )
         article.tags = tags
         
@@ -125,7 +125,7 @@ class ArticleController:
             )
         
         # Проверяем права
-        if article.author_id != current_user.id:
+        if article.author_id != current_user.get("id"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to update this article"
@@ -190,7 +190,7 @@ class ArticleController:
                 detail="Article not found"
             )
         
-        if article.author_id != current_user.id:
+        if article.author_id != current_user.get("id"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this article"

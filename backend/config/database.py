@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
     @classmethod
     @property
     def __tablename__(cls):
-        return "blog_" + cls.__qualname__.lower() + "s"
+        return cls.__qualname__.lower() + "s"
 
 
 # Экспортируем DATABASE_URL для обратной совместимости с миграциями
