@@ -49,7 +49,6 @@ class ArticleController:
             body=article_data.body,
             author_id=author.get("id"),
         )
-        article.tags = tags
         
         db.add(article)
         await db.commit()

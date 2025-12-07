@@ -23,7 +23,6 @@ class Article(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
-    tags = relationship("Tag", secondary="article_tags", backref="articles")
 
 # Таблица связи многие-ко-многим
 article_tags = Table(
