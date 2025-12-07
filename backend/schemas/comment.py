@@ -1,0 +1,21 @@
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+class CommentBase(BaseModel):
+    """Базовая схема комментария"""
+    body: str
+
+class CommentCreate(CommentBase):
+    """Схема создания комментария"""
+    pass
+
+class CommentResponse(CommentBase):
+    """Схема ответа на запрос о комментарии"""
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    author: int
+    
+    class Config:
+        from_attributes = True

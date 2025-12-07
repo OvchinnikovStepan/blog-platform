@@ -1,51 +1,112 @@
 services:
-  postgres:
+  # --- MAIN BACKEND DB ---
+  postgres-main:
     image: postgres:15-alpine
-    container_name: blog_postgres
+    container_name: blog_postgres_main
     environment:
-      POSTGRES_DB: blog_db
       POSTGRES_USER: blog_user
       POSTGRES_PASSWORD: blog_password
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: blog_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_main_data:/var/lib/postgresql/data
+      - ./init/main:/docker-entrypoint-initdb.d
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U blog_user -d blog_db"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: unless-stopped
 
-  app:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: blog_app
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: >
-      sh -c "sleep 10 && 
-             alembic upgrade head && 
-             uvicorn src.main:app --host 0.0.0.0 --port 8000"
+  # --- USERS DB ---
+  postgres-users:
+    image: postgres:15-alpine
+    container_name: blog_postgres_users
+    environment:
+      POSTGRES_USER: blog_user
+      POSTGRES_PASSWORD: blog_password
+      POSTGRES_DB: users_db
+    volumes:
+      - postgres_users_data:/var/lib/postgresql/data
+      - ./init/users:/docker-entrypoint-initdb.d
+    networks:
+      - internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5).raise_for_status()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
+      test: ["CMD-SHELL", "pg_isready -U blog_user -d users_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-volumes:
-  postgres_data:
-    name: blog_postgres_data
+  # --- MAIN BACKEND SERVICE ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend-service
+    env_file:
+      - backend/.env
+    depends_on:
+      postgres-main:
+        condition: service_healthy
+    networks:
+      - internal
+    expose:
+      - "8000"
+    command: >
+      sh -c "sleep 5 &&
+             alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  # --- USERS SERVICE ---
+  users-service:
+    build:
+      context: ./users_service
+      dockerfile: Dockerfile
+    container_name: blog_users_service
+    env_file:
+      - users_service/.env
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    networks:
+      - internal
+    expose:
+      - "8000"
+    command: >
+      sh -c "sleep 5 &&
+             alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  # --- NGINX API GATEWAY ---
+  api-gateway:
+    image: nginx:latest
+    container_name: blog_api_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - users-service
+    networks:
+      - internal
 
 networks:
-  default:
-    name: blog_network
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_main_data:
+  postgres_users_data:
