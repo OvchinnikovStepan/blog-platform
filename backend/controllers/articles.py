@@ -55,7 +55,6 @@ class ArticleController:
 
         result = await db.execute(
             select(Article)
-            .options(selectinload(Article.tags))  # ← ВАЖНО: явная загрузка тегов
             .where(Article.id == article.id)
         )
         article_with_relations = result.scalar_one()
@@ -70,8 +69,7 @@ class ArticleController:
         result = await db.execute(
             select(Article)
             .options(
-                selectinload(Article.author),
-                selectinload(Article.tags)
+                selectinload(Article.author_id),
             )
             .filter(Article.is_deleted == False)
             .order_by(Article.created_at.desc())
@@ -87,8 +85,7 @@ class ArticleController:
         result = await db.execute(
             select(Article)
             .options(
-                selectinload(Article.author),
-                selectinload(Article.tags)
+                selectinload(Article.author_id),
             )
             .filter(
                 Article.id == article_id,

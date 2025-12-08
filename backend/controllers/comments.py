@@ -78,7 +78,7 @@ class CommentController:
         # Находим комментарий
         result = await db.execute(
             select(Comment)
-            .options(selectinload(Comment.article))
+            .options(selectinload(Comment.article_id))
             .filter(
                 Comment.id == comment_id,
                 Comment.is_deleted == False
@@ -93,7 +93,7 @@ class CommentController:
             )
         
         # Проверяем права: автор комментария или автор статьи
-        if comment.author_id != current_user.get("id") and comment.article.author_id != current_user.get("id"):
+        if comment.author_id != current_user.get("id") : #and comment.article_id.author_id != current_user.get("id")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this comment"
