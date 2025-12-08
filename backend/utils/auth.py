@@ -1,28 +1,45 @@
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import httpx
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException, Depends, status
+from config.config import settings
+from jose import JWTError, jwt
 
 USERS_SERVICE_URL = "http://users-service:8000"
 
 security = HTTPBearer()
 
+
+def decode_token(token: str) -> dict:
+    """Декодирование JWT токена"""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
 async def verify_token(
-    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        if not credentials or not credentials.credentials:
-            raise HTTPException(status_code=401, detail="Missing Authorization header")
-        auth_header = f"Bearer {credentials.credentials}"
+    if not credentials or not credentials.credentials:
+                raise HTTPException(status_code=401, detail="Missing Authorization header")
+    else:
+            token = credentials.credentials
+            payload = decode_token(token)
+            
+            if payload is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            user_id: int = payload.get("user_id")
+            if user_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            response={"id":user_id}
+            return response
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{USERS_SERVICE_URL}/users/me",
-            headers={"Authorization": auth_header}
-        )
-
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    return resp.json()
