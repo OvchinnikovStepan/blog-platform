@@ -10,7 +10,7 @@ class CommentController:
     """Асинхронный контроллер для операций с комментариями"""
     
     @staticmethod
-    async def create_comment(article_id: int, comment_data: CommentCreate, author: dict, db: AsyncSession) -> Comment:
+    async def create_comment(article_id: int, comment_data: CommentCreate, current_user: dict, db: AsyncSession) -> Comment:
         """Асинхронное создание комментария"""
         # Проверяем существование статьи
         result = await db.execute(
@@ -31,7 +31,7 @@ class CommentController:
         comment = Comment(
             body=comment_data.body,
             article_id=article_id,
-            author_id=author.get("id")
+            author_id=current_user.get("id")
         )
         
         db.add(comment)
@@ -61,7 +61,6 @@ class CommentController:
         # Получаем комментарии с информацией об авторах
         result = await db.execute(
             select(Comment)
-            .options(selectinload(Comment.author))
             .filter(
                 Comment.article_id == article_id,
                 Comment.is_deleted == False
@@ -78,7 +77,6 @@ class CommentController:
         # Находим комментарий
         result = await db.execute(
             select(Comment)
-            .options(selectinload(Comment.article_id))
             .filter(
                 Comment.id == comment_id,
                 Comment.is_deleted == False
@@ -93,7 +91,7 @@ class CommentController:
             )
         
         # Проверяем права: автор комментария или автор статьи
-        if comment.author_id != current_user.get("id") : #and comment.article_id.author_id != current_user.get("id")
+        if comment.author_id != current_user.get("id"):# and comment.article.author_id != current_user.get("id"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this comment"

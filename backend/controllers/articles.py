@@ -68,9 +68,6 @@ class ArticleController:
         """Асинхронное получение списка статей"""
         result = await db.execute(
             select(Article)
-            .options(
-                selectinload(Article.author_id),
-            )
             .filter(Article.is_deleted == False)
             .order_by(Article.created_at.desc())
             .offset(skip)
@@ -84,9 +81,6 @@ class ArticleController:
         """Асинхронное получение статьи по ID"""
         result = await db.execute(
             select(Article)
-            .options(
-                selectinload(Article.author_id),
-            )
             .filter(
                 Article.id == article_id,
                 Article.is_deleted == False
@@ -106,7 +100,6 @@ class ArticleController:
         """Асинхронное обновление статьи"""
         result = await db.execute(
             select(Article)
-            .options(selectinload(Article.tags))
             .filter(
                 Article.id == article_id,
                 Article.is_deleted == False

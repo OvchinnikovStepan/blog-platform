@@ -15,7 +15,7 @@ class CommentResponse(CommentBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    author: int
+    author_id: int
     
     class Config:
         from_attributes = True
