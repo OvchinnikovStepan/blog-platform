@@ -50,6 +50,8 @@ services:
     depends_on:
       postgres-main:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - internal
     expose:
@@ -117,6 +119,32 @@ services:
     networks:
       - internal
 
+  redis:
+    image: redis:7-alpine
+    container_name: blog_redis
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    build: ./worker
+    container_name: blog_worker
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-main:
+        condition: service_healthy
+      postgres-users:
+        condition: service_healthy
+    networks:
+      - internal
+
 networks:
   internal:
     driver: bridge
@@ -124,3 +152,5 @@ networks:
 volumes:
   postgres_main_data:
   postgres_users_data:
+
+

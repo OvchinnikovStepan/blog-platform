@@ -1,7 +1,8 @@
+from sqlite3 import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
-from models.models import User
+from models.models import Subscriber, User
 from schemas.user import UserCreate, UserLogin, UserUpdate
 from config.auth import verify_password, get_password_hash, create_access_token
 from datetime import timedelta
@@ -86,3 +87,59 @@ class UserController:
         await db.commit()
         await db.refresh(current_user)
         return current_user
+    
+    @staticmethod
+    async def set_subscription_key(
+        user: User,
+        subscription_key: str,
+        db: AsyncSession,
+    ) -> User:
+        if not subscription_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription key cannot be empty",
+            )
+        setattr(user, "subscription_key", subscription_key)
+        await db.commit()
+        await db.refresh(user)
+
+        return user
+    
+    @staticmethod
+    async def subscribe(
+            subscriber: User,
+            target_user_id: int,
+            db: AsyncSession,
+        ) -> None:
+            if subscriber.id == target_user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You cannot subscribe to yourself",
+                )
+
+            result = await db.execute(
+                select(User).where(User.id == target_user_id)
+            )
+            target_user = result.scalar_one_or_none()
+
+            if not target_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Target user not found",
+                )
+
+            subscription = Subscriber(
+                subscriber_id=subscriber.id,
+                author_id=target_user_id,
+            )
+
+            db.add(subscription)
+
+            try:
+                await db.commit()
+            except IntegrityError:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Already subscribed to this user",
+                )

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.database import get_db
-from schemas.user import UserCreate, UserLogin, UserUpdate, UserResponse, Token
+from schemas.user import UserCreate, UserLogin, UserUpdate, UserResponse, Token, AddSubscriptionKeyRequest, SubscribeRequest
 from controllers.users import UserController
 from utils.auth import get_current_user
 from models.models import User
@@ -42,3 +42,39 @@ async def update_user(
     """Обновление профиля пользователя"""
     return await UserController.update_user_profile(user_data, current_user, db)
 
+@router.put(
+    "/users/me/subscription-key",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def set_subscription_key(
+    data: AddSubscriptionKeyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Установка subscription_key текущему пользователю
+    """
+    return await UserController.set_subscription_key(
+        user=current_user,
+        subscription_key=data.subscription_key,
+        db=db,
+    )
+
+@router.post(
+    "/users/subscribe",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def subscribe_to_user(
+    data: SubscribeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Подписка текущего пользователя на другого пользователя
+    """
+    await UserController.subscribe(
+        subscriber=current_user,
+        target_user_id=data.target_user_id,
+        db=db,
+    )

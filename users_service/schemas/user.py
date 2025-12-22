@@ -42,3 +42,9 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
+
+class AddSubscriptionKeyRequest(BaseModel):
+    subscribtion_key: str
+
+class SubscribeRequest(BaseModel):
+    target_user_id: int
