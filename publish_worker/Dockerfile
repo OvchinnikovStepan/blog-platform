@@ -13,4 +13,4 @@ RUN chown -R celery:celery /app
 
 USER celery
 
-CMD ["celery", "-A", "celery_app:celery_app", "worker", "-Q","notify.queue","--loglevel=info"]
+CMD ["celery", "-A", "celery_app:celery_app", "worker", "-Q","publish.queue","--loglevel=info"]

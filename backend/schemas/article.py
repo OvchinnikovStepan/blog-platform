@@ -40,6 +40,8 @@ class ArticleResponse(ArticleBase):
             return [tag.name for tag in v]
         return v
 
+class ArticlePreview(BaseModel):
+    preview_url: str
 
 class ArticleListResponse(BaseModel):
     "Получение списка статей"

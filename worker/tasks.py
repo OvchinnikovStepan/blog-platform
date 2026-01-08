@@ -1,6 +1,7 @@
 import logging
 import requests
-from celery_app import celery_app
+from .celery_app import app
+from shared.celery.tasks import NOTIFY_FOLOWWERS
 from config import USERS_DATABASE_URL, POSTS_DATABASE_URL, PUSH_URL
 from db.base import create_session
 from repositories.users_repo import UsersRepository
@@ -8,8 +9,8 @@ from repositories.users_repo import UsersRepository
 UsersSession = create_session(USERS_DATABASE_URL)
 PostsSession = create_session(POSTS_DATABASE_URL)
 
-@celery_app.task(
-    name="notify_followers",
+@app.task(
+    name=NOTIFY_FOLOWWERS,
     bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
@@ -37,6 +38,23 @@ def notify_followers(self, author_id: int, post_id: int, post_title: str):
                 json={"message": f"Пользователь {author_id} выпустил новый пост: {post_title[:10]}..."},
                 timeout=5,
         ).raise_for_status()
+
+    except Exception as e:
+
+        if self.request.retries >= 5:
+            app.send_task(
+                "dlq.handle",
+                kwargs={
+                    "task_name": "post.notify",
+                    "post_id": post_id,
+                    "reason": str(e),
+                },
+                queue="dlq",
+            )
+            logging.error("post.moderate sent to DLQ, post_id=%s", post_id)
+            return
+
+        raise
 
     finally:
         users_db.close()

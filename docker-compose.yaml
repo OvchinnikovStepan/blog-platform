@@ -152,6 +152,53 @@ services:
     networks:
       - internal
 
+  moderation-worker:
+    build: ./moderation_worker
+    env_file:
+      - moderation_worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  preview-worker:
+    build: ./preview_worker
+    env_file:
+      - preview_worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  publish-worker:
+    build: ./publish_worker
+    env_file:
+      - publish_worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  dlq-worker:
+    build: ./dlq_worker
+    env_file:
+      - dlq_worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
 
 networks:
   internal:

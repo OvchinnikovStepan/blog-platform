@@ -1,3 +1,4 @@
+from models.article_status import ArticleStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -6,7 +7,7 @@ from datetime import datetime
 from models.models import Article, Tag
 from schemas.article import ArticleCreate, ArticleUpdate
 from utils.slug import create_slug
-from utils.tasks import notify_followers
+from utils.tasks import send_to_moderation
 
 class ArticleController:
     """Асинхронный контроллер для операций со статьями"""
@@ -54,11 +55,11 @@ class ArticleController:
         db.add(article)
         await db.commit()
 
-        notify_followers.delay(
-            author_id=author.get("id"),
-            post_id=article.id,
-            post_title= article.title
-        )
+        # notify_followers.delay(
+        #     author_id=author.get("id"),
+        #     post_id=article.id,
+        #     post_title= article.title
+        # )
 
         result = await db.execute(
             select(Article)
@@ -75,7 +76,8 @@ class ArticleController:
         """Асинхронное получение списка статей"""
         result = await db.execute(
             select(Article)
-            .filter(Article.is_deleted == False)
+            .filter(Article.is_deleted == False,
+                    Article.status == ArticleStatus.PUBLISHED)
             .order_by(Article.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -84,13 +86,29 @@ class ArticleController:
         return articles
     
     @staticmethod
+    async def get_users_articles(current_user: dict, db: AsyncSession) -> list[Article]:
+        """Асинхронное получение списка своих статей"""
+        author_id=int(current_user["id"])
+        result = await db.execute(
+            select(Article)
+            .filter(Article.author_id == author_id)
+            .order_by(Article.id.desc())
+            .all()
+            )
+        
+        articles = result.scalars().all()
+        return articles
+    
+
+    @staticmethod
     async def get_article_by_id(article_id: int, db: AsyncSession) -> Article:
         """Асинхронное получение статьи по ID"""
         result = await db.execute(
             select(Article)
             .filter(
                 Article.id == article_id,
-                Article.is_deleted == False
+                Article.is_deleted == False,
+                Article.status == ArticleStatus.PUBLISHED
             )
         )
         article = result.scalar_one_or_none()
@@ -101,6 +119,36 @@ class ArticleController:
                 detail="Article not found"
             )
         return article
+    
+    @staticmethod
+    async def publish_article(article_id: int,current_user: dict, db: AsyncSession) -> Article:
+        result = await db.execute(
+            select(Article).where(Article.id == article_id)
+        )
+        article = result.scalar_one_or_none()
+
+        if not article:
+            raise HTTPException(status_code=404, detail="Article not found")
+
+        if article.status != ArticleStatus.DRAFT:
+            raise HTTPException(
+                status_code=400,
+                detail="Post can be published only from DRAFT status",
+            )
+
+        article.status = ArticleStatus.PENDING_PUBLISH
+        await db.commit()
+
+        send_to_moderation(
+            post_id=article_id,
+            author_id=article.author_id,
+            requested_by=article.author_id,
+            title= article.title,
+            body= article.body
+        )
+
+        return {"status": "PENDING_PUBLISH"}
+
     
     @staticmethod
     async def update_article(article_id: int, article_data: ArticleUpdate, current_user: dict, db: AsyncSession) -> Article:
@@ -198,3 +246,95 @@ class ArticleController:
         
         await db.commit()
         return {"message": "Article soft deleted successfully"}
+    
+
+    @staticmethod
+    async def reject_article(article_id: int,db: AsyncSession,service:str):
+
+        result = await db.execute(
+            select(Article).filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
+
+        if not article:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        if article.status == ArticleStatus.REJECTED:
+            return {"status": "already_rejected"}
+
+        if article.status != ArticleStatus.PENDING_PUBLISH:
+            return {"status": "ignored", "current_status": article.status}
+
+        article.status = ArticleStatus.REJECTED
+        await db.commit()
+
+        return {"status": "rejected"}
+    
+    @staticmethod
+    async def add_article_preview(article_id: int, preview_url:str, service:str, db: AsyncSession):
+        
+        result = await db.execute(
+            select(Article).filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
+        if not article:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        if article.status != ArticleStatus.PENDING_PUBLISH:
+            return {"status": "ignored", "current_status": article.status}
+        
+        article.preview_url = preview_url
+        await db.commit()
+
+        return {"status": "url updated"}
+    
+    @staticmethod
+    async def complete_publish_article(article_id: int,db: AsyncSession,service:str):
+
+        result = await db.execute(
+            select(Article).filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
+        if not article:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        if article.status == ArticleStatus.PUBLISHED:
+            return {"status": "already_published"}
+
+        if article.status != ArticleStatus.PENDING_PUBLISH:
+            return {"status": "ignored", "current_status": article.status}
+
+        article.status = ArticleStatus.PUBLISHED
+        await db.commit()
+
+        return {"status": "published"}
+    
+    @staticmethod
+    async def set_error_article(article_id: int,db: AsyncSession):
+
+        result = await db.execute(
+            select(Article).filter(
+                Article.id == article_id,
+                Article.is_deleted == False
+            )
+        )
+        article = result.scalar_one_or_none()
+        if not article:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        if article.status == ArticleStatus.ERROR:
+            return {"status": "already_error"}
+
+        article.status = ArticleStatus.ERROR
+        await db.commit()
+
+        return {"status": "error_set"}

@@ -1,6 +1,5 @@
 from celery import Celery
 
-app = Celery("backend")
+app = Celery("publish_worker")
 
 app.config_from_object("shared.celery.config")
-app.config_from_object("shared.celery.routes")

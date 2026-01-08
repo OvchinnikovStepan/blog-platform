@@ -2,7 +2,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Tabl
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from config.database import Base
-
+from models.article_status import ArticleStatus
+from sqlalchemy import Enum
 
 class Tag(Base):
     __table_args__ = {'extend_existing': True}
@@ -23,6 +24,15 @@ class Article(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    status = Column(
+        Enum(ArticleStatus, name="post_status"),
+        nullable=False,
+        default=ArticleStatus.DRAFT,
+        index=True,
+    )
+
+    preview_url = Column(String, nullable=True)
 
 # Таблица связи многие-ко-многим
 article_tags = Table(
