@@ -26,6 +26,7 @@ class UserResponse(UserBase):
     image_url: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    subscription_key: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -44,7 +45,7 @@ class TokenData(BaseModel):
     user_id: Optional[int] = None
 
 class AddSubscriptionKeyRequest(BaseModel):
-    subscribtion_key: str
+    subscription_key: str
 
 class SubscribeRequest(BaseModel):
     target_user_id: int

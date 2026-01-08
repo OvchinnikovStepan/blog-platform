@@ -6,7 +6,7 @@ from datetime import datetime
 from models.models import Article, Tag
 from schemas.article import ArticleCreate, ArticleUpdate
 from utils.slug import create_slug
-from ..tasks import notify_followers
+from utils.tasks import notify_followers
 
 class ArticleController:
     """Асинхронный контроллер для операций со статьями"""
@@ -57,6 +57,7 @@ class ArticleController:
         notify_followers.delay(
             author_id=author.get("id"),
             post_id=article.id,
+            post_title= article.title
         )
 
         result = await db.execute(
